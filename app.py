@@ -17,8 +17,10 @@ Base = automap_base()
 Base.prepare(engine, reflect=True)
 
 # Save reference to the table
-station = Base.classes.station
+Station = Base.classes.station
 measurement = Base.classes.measurement
+
+session = Session(engine)
 
 # Flask Setup
 app = Flask(__name__)
@@ -37,14 +39,9 @@ def welcome():
     )
 @app.route("/api/v1.0/stations")
 def stations():
-    # Create our session (link) from Python to the DB
-    session = Session(engine)
-
     """Return a list of station data including station, the name"""
-    # Query all station
-    results = session.query(station.station, station.name).all()
-
-    session.close()
+    args=[(Station.station), (Station.name)]
+    results = session.query(*args).all()
 
     # Create a dictionary from the row data and append to a list of all_stations
     all_stations = []
@@ -59,13 +56,10 @@ def stations():
 @app.route("/api/v1.0/precipitation")
 def preciptations():
     # Create our session (link) from Python to the DB
-    session = Session(engine)
 
     """Return a list of passenger data including the name, age, and sex of each passenger"""
     # Query all passengers
     results = session.query(measurement.date, measurement.prcp).all()
-
-    session.close()
 
     # Create a dictionary from the row data and append to a list of all_preciptations
     all_precipitations = []
@@ -80,9 +74,8 @@ def preciptations():
 @app.route("/api/v1.0/tobs")
 # Query the dates and temperature observations of the most active station for the last year of data.
 def tobs():
-    session = Session(engine)
-
-    active_stations_descending = session.query(measurement.station, func.count(measurement.station)).\
+    args = [measurement.station, func.count(measurement.station)]
+    active_stations_descending = session.query(*args).\
                 group_by(measurement.station).order_by(func.count(measurement.station).desc()).all()
 
     most_active_station = active_stations_descending[0][0]
@@ -102,10 +95,9 @@ def tobs():
 @app.route("/api/v1.0/<start>")
 # When given the start only, calculate TMIN, TAVG, and TMAX for all dates greater than and equal to the start date.
 def get_start(start):
-    session = Session(engine)
-    results = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).\
+    args=[func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)]
+    results = session.query(*args).\
         filter(measurement.date >= start).all()
-    session.close()
 
     tobsall = []
     for min,avg,max in results:
@@ -121,10 +113,9 @@ def get_start(start):
 # Return a JSON list of the minimum temperature, the average temperature, and the max temperature for a given start or start-end range.
 
 def get_t_start_stop(start,stop):
-    session = Session(engine)
-    results = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).\
+    arg = [func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)]
+    results = session.query(*arg).\
         filter(measurement.date >= start).filter(measurement.date <= stop).all()
-    session.close()
 
     tobsall = []
     for min,avg,max in results:
